@@ -45,6 +45,9 @@ except ImportError:
     print("[Convex] Error: 'convex' module not found. Database operations will be mocked.")
     convex_client = None
 
+class ModelUnavailableError(RuntimeError):
+    """Raised when the neural runtime is missing, so no genuine verdict can be produced."""
+
 ROOT_DIR = Path(__file__).resolve().parent
 WEB_DIR = ROOT_DIR / "web"
 # Active model: pinned to xception_deepfake_detector.h5 for now.
@@ -76,7 +79,7 @@ def _import_tensorflow():
             HAS_TENSORFLOW = True
         except ImportError as e:
             HAS_TENSORFLOW = False
-            print(f"[Warning] TensorFlow not found ({e}). Switching to Inference Mock mode.")
+            print(f"[Warning] TensorFlow not found ({e}). Predictions will be refused.")
     if not HAS_TENSORFLOW:
         return None
     import tensorflow as tf
@@ -254,88 +257,6 @@ def extract_noise_features(img_array):
 # ==========================================
 # PREDICTION ENGINE
 # ==========================================
-def _predict_mock(file_bytes, audit_log):
-    """Fallback mock engine when TensorFlow is unavailable."""
-    # --- IMAGE PREP ---
-    image_pil = Image.open(io.BytesIO(file_bytes)).convert('RGB')
-    image_pil = ImageOps.exif_transpose(image_pil)
-    full_img_array = np.array(image_pil)
-    
-    # Simple center crop for the mock output
-    h_img, w_img, _ = full_img_array.shape
-    side = min(h_img, w_img)
-    x1, y1 = (w_img - side) // 2, (h_img - side) // 2
-    crop = Image.fromarray(full_img_array[y1:y1+side, x1:x1+side]).resize((299, 299), resample=Image.Resampling.LANCZOS)
-    crop_np = np.array(crop)
-    
-    # Mock some analysis
-    is_fake_1b, msg_1b = check_c2pa(file_bytes, audit_log)
-    is_fake_1a, msg_1a = check_metadata(file_bytes, audit_log)
-    
-    # Weighted random verdict if not already caught by Tier 1
-    if is_fake_1a or is_fake_1b:
-        ensemble_score = 1.0
-        verdict_label = "Fake"
-        reason = f"Undeniable Digital Evidence.\n{msg_1b if is_fake_1b else msg_1a}"
-    else:
-        # 40% chance of fake for mock
-        is_mock_fake = random.random() < 0.4
-        ensemble_score = random.uniform(0.85, 0.98) if is_mock_fake else random.uniform(0.02, 0.15)
-        verdict_label = "Fake" if is_mock_fake else "Real"
-        reason = "Forensic structural interrogation detected AI noise patterns." if is_mock_fake else "Verified Authentic. Passed structural interrogation."
-
-    audit_log.append(f"[MOCK] Analysis complete ({ensemble_score:.1%} suspect).")
-    audit_log.append("[FINISH] Analysis compiled.")
-
-    # Generate mock visual data
-    graph_keys = ['frequency', 'edge', 'noise']
-    random.shuffle(graph_keys)
-    primary_type = verdict_label.upper()
-    
-    forensic_profiles = {
-        graph_keys[0]: {"type": primary_type, "seed": float(round(random.uniform(0.1, 1.0), 3))},
-        graph_keys[1]: {"type": primary_type, "seed": float(round(random.uniform(0.1, 1.0), 3))},
-        graph_keys[2]: {"type": primary_type, "seed": float(round(random.uniform(0.1, 1.0), 3))}
-    }
-
-    visual_data = {
-        "profiles": {k: v["type"] for k, v in forensic_profiles.items()},
-        "variances": {
-            "freq_steepness": 3.5, "freq_amplitude": 0.5, "freq_spike_freq": 35.0,
-            "edge_jitter": 0.1, "noise_sigma_real": 0.07, "noise_sigma_fake": 0.25,
-            "noise_peak": 1.0, "noise_asymmetry": 0.0
-        }
-    }
-
-    report = f"--- FINAL FORENSIC REPORT (MOCK) ---\nVERDICT: {verdict_label.upper()} ({ensemble_score:.1% if verdict_label == 'Fake' else (1.0-ensemble_score):.1%})\n\nREASON: {reason}\n\nNote: Running in Inference Mock mode due to missing local neural runtime."
-    report += f"\n\n=== SYSTEM AUDIT LOG ===\n" + "\n".join(audit_log)
-
-    return {
-        "prediction": verdict_label,
-        "confidence": float(round(ensemble_score if verdict_label == "Fake" else 1.0 - ensemble_score, 4)),
-        "ensemble_score": float(round(ensemble_score, 4)),
-        "threshold_used": 0.50,
-        "model_loaded": False,
-        "explanation": report,
-        "heatmap": _encode_image_base64(crop_np), # No real heatmap in mock
-        "crop_image": _encode_image_base64(crop_np),
-        "originalImage": f"data:image/jpeg;base64,{_encode_image_base64(full_img_array)}",
-        "visual_data": visual_data,
-        "forensic_profiles": forensic_profiles,
-        "debug_scores": {
-            "dl_score": float(round(ensemble_score, 4)),
-            "frequency_score": float(round(ensemble_score, 4)),
-            "edge_score": float(round(ensemble_score, 4)),
-            "noise_score": float(round(ensemble_score, 4))
-        },
-        "details": {
-            "face_detected": True,
-            "frequency_suspicious": verdict_label == "Fake",
-            "num_faces": 1,
-            "audit_log": "\n".join(audit_log)
-        },
-    }
-
 def predict_from_bytes(file_bytes):
     tf = _import_tensorflow()
     model = _load_model()
@@ -343,10 +264,13 @@ def predict_from_bytes(file_bytes):
     
     audit_log = ["[START] Triple-Tier Forensic Interrogation initiated."]
 
-    # If TensorFlow is missing, we use the "Inference Mock" engine
+    # Fail loudly. Without the neural runtime there is no way to produce a genuine
+    # verdict, and returning a fabricated one is worse than returning nothing.
     if tf is None or model is None:
-        audit_log.append("[SYSTEM] TensorFlow or Model not found. Falling back to Inference Mock engine.")
-        return _predict_mock(file_bytes, audit_log)
+        raise ModelUnavailableError(
+            "Neural runtime unavailable: TensorFlow or the Xception model failed to load. "
+            "No verdict was produced."
+        )
     
     # --- TIER 1: SUPREME PRIORITY ---
     is_fake_1b, msg_1b = check_c2pa(file_bytes, audit_log)
@@ -1019,6 +943,9 @@ class Handler(BaseHTTPRequestHandler):
                     print(f"[Convex Error] {e}")
 
             self._send_json(result)
+        except ModelUnavailableError as exc:
+            print(f"[Unavailable] {exc}")
+            self._send_json({"error": str(exc)}, status=HTTPStatus.SERVICE_UNAVAILABLE)
         except Exception as exc:
             import traceback
             error_detail = traceback.format_exc()
@@ -1029,7 +956,7 @@ def _warmup_runtime():
     """Load TensorFlow, the model and the face detector in the background."""
     try:
         if _import_tensorflow() is None:
-            print("[Warmup] TensorFlow unavailable - running in Inference Mock mode.")
+            print("[Warmup] TensorFlow unavailable - predictions will be refused.")
             return
         _load_model()
         _load_mtcnn()
