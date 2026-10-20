@@ -187,7 +187,7 @@ section[id] {
 }
 
 [data-theme="light"] #canvas-bg {
-  opacity: 0.3;
+  opacity: 0.05;
 }
 
 .wrap {
