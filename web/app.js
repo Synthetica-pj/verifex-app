@@ -138,7 +138,7 @@ async function pingBackendHealth(timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(apiUrl(`/health?probe=${Date.now()}`), {
+    const res = await fetch(apiUrl("/health"), {
       signal: controller.signal,
       cache: "no-store",
     });
