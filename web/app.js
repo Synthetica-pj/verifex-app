@@ -2809,7 +2809,7 @@ function initThree() {
   const vertices = [];
   const size = 2000;
 
-  for (let i = 0; i < 1000; i++) {
+  for (let i = 0; i < 5000; i++) {
     const x = (Math.random() - 0.5) * size;
     const y = (Math.random() - 0.5) * size;
     const z = (Math.random() - 0.5) * size;
@@ -2820,14 +2820,14 @@ function initThree() {
 
   const getThemeColor = () => {
     const theme = document.documentElement.getAttribute("data-theme");
-    return 0x14b8a6; // brand teal
+    return theme === "light" ? 0x000000 : 0xffffff;
   };
 
   const material = new THREE.PointsMaterial({
     color: getThemeColor(),
     size: 1.5,
     transparent: true,
-    opacity: 0.6,
+    opacity: 0.2,
     sizeAttenuation: true,
   });
 
@@ -2878,9 +2878,9 @@ function initTheme() {
     localStorage.setItem("theme", theme);
     
     if (window.bgMaterial) {
-      const color = 0x14b8a6; // Keep brand teal
+      const color = theme === "light" ? 0x000000 : 0xffffff;
       window.bgMaterial.color.setHex(color);
-      window.bgMaterial.opacity = theme === "light" ? 0.35 : 0.6;
+      window.bgMaterial.opacity = theme === "light" ? 0.05 : 0.2;
     }
     
     const nav = document.querySelector('.nav');
