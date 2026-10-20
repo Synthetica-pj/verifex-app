@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  verifex-app:
+    build: .
+    container_name: verifex-ai-engine
+    restart: always
+    ports:
+      # The container listens on 7860 (see ENV PORT in the Dockerfile).
+      - "127.0.0.1:7860:7860"
+    environment:
+      # These are populated from your local .env file
+      - CONVEX_URL=${CONVEX_URL}
+      - CLERK_PUBLISHABLE_KEY=${CLERK_PUBLISHABLE_KEY}
+      - TF_ENABLE_ONEDNN_OPTS=0
+      - TF_CPP_MIN_LOG_LEVEL=2
+    volumes:
+      # Persistent storage for logs or uploaded files if needed
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

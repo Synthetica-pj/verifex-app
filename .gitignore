@@ -1,0 +1,26 @@
+# --- Secrets / local environment ---
+.env
+.env.local
+
+# --- Python ---
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# --- Node ---
+node_modules/
+
+# --- Training data & scripts (kept locally, never shipped) ---
+backend/Custom dataset/
+backend/modeltraining.py.py
+
+# --- Logs & scratch output ---
+*.log
+out.log
+
+# --- Deploy / editor / OS ---
+.vercel
+.trae
+.DS_Store
+Thumbs.db

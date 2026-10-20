@@ -1,0 +1,19 @@
+# --- Inference core (CPU-only runtime) ---
+# Pinned to the exact set verified locally (Python 3.12). Every entry below was
+# checked to ship a Linux manylinux wheel, so the Hugging Face Docker build
+# never needs a compiler.
+tensorflow-cpu==2.21.0
+numpy==2.5.4
+scipy==1.18.1
+pillow==12.3.0
+opencv-python==5.0.0.93
+mtcnn==1.0.0
+
+# --- Tier 1 forensic metadata / C2PA ---
+c2pa-python==0.38.0
+
+# --- Cloud database (scan history) ---
+convex==0.8.1
+
+# --- HTTP client ---
+requests==2.34.2
