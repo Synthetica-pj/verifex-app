@@ -727,13 +727,13 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._send_json({"error": str(e)}, status=HTTPStatus.BAD_REQUEST)
             return
-        if self.path == "/health":
+        if self.path.split("?", 1)[0] == "/health":
             self._send_json({"ok": True, "version": "4.0-integrated"})
             return
         self._serve_static(self.path.split("?", 1)[0])
 
     def do_HEAD(self):
-        if self.path == "/health":
+        if self.path.split("?", 1)[0] == "/health":
             body = json.dumps({"ok": True, "version": "4.0-integrated"}, indent=2).encode("utf-8")
             self._send_headers_only(len(body), content_type="application/json; charset=utf-8")
             return
