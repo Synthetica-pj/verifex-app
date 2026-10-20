@@ -2809,7 +2809,7 @@ function initThree() {
   const vertices = [];
   const size = 2000;
 
-  for (let i = 0; i < 5000; i++) {
+  for (let i = 0; i < 1000; i++) {
     const x = (Math.random() - 0.5) * size;
     const y = (Math.random() - 0.5) * size;
     const z = (Math.random() - 0.5) * size;
