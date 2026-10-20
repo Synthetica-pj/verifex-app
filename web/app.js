@@ -2882,6 +2882,14 @@ function initTheme() {
       window.bgMaterial.color.setHex(color);
       window.bgMaterial.opacity = theme === "light" ? 0.05 : 0.2;
     }
+
+    if (window.neuralMaterial && window.neuralLineMaterial) {
+      const color = theme === "light" ? 0x000000 : 0xffffff;
+      window.neuralMaterial.color.setHex(color);
+      window.neuralLineMaterial.color.setHex(color);
+      window.neuralMaterial.opacity = theme === "light" ? 0.6 : 0.8;
+      window.neuralLineMaterial.opacity = theme === "light" ? 0.20 : 0.25;
+    }
     
     const nav = document.querySelector('.nav');
     if (nav) {
@@ -2957,6 +2965,140 @@ function initLinkInterceptors() {
   });
 }
 
+function initNeuralLink() {
+  const canvas = $("neural-canvas");
+  if (!canvas) return;
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  
+  const container = canvas.parentElement;
+  const isFixed = window.getComputedStyle(canvas).position === 'fixed';
+  
+  const updateSize = () => {
+    const width = isFixed ? window.innerWidth : container.clientWidth;
+    const height = isFixed ? window.innerHeight : container.clientHeight;
+    renderer.setSize(width, height);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+  };
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 2000);
+  camera.position.z = 100; // Force camera significantly closer as requested (Base 100)
+
+  const particleCount = 150; // Adjusted back to 150
+  const particles = new THREE.BufferGeometry();
+  const pPositions = new Float32Array(particleCount * 3);
+  const velocities = [];
+
+  for (let i = 0; i < particleCount; i++) {
+    pPositions[i * 3] = (Math.random() - 0.5) * 800;
+    pPositions[i * 3 + 1] = (Math.random() - 0.5) * 400;
+    pPositions[i * 3 + 2] = (Math.random() - 0.5) * 400;
+    velocities.push({
+      x: (Math.random() - 0.5) * 0.5,
+      y: (Math.random() - 0.5) * 0.5,
+      z: (Math.random() - 0.5) * 0.5
+    });
+  }
+
+  particles.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+
+  const getThemeColor = () => {
+    const theme = document.documentElement.getAttribute("data-theme");
+    return theme === "light" ? 0x000000 : 0xffffff; // Pure black for light theme to ensure maximum visibility
+  };
+
+  const pMaterial = new THREE.PointsMaterial({
+    color: getThemeColor(),
+    size: 3, // Slightly smaller for a cleaner look
+    transparent: true,
+    opacity: document.documentElement.getAttribute("data-theme") === "light" ? 0.6 : 0.8
+  });
+
+  const particleSystem = new THREE.Points(particles, pMaterial);
+  scene.add(particleSystem);
+
+  const linesMaterial = new THREE.LineBasicMaterial({
+    color: getThemeColor(),
+    transparent: true,
+    opacity: document.documentElement.getAttribute("data-theme") === "light" ? 0.20 : 0.2, // Adjusted to 0.20 for an even more subtle look
+    linewidth: 1
+  });
+
+  const linesGeometry = new THREE.BufferGeometry();
+  const lineMesh = new THREE.LineSegments(linesGeometry, linesMaterial);
+  scene.add(lineMesh);
+
+  window.neuralMaterial = pMaterial;
+  window.neuralLineMaterial = linesMaterial;
+
+  updateSize();
+  window.addEventListener('resize', updateSize);
+
+  let mouseX = 0;
+  let mouseY = 0;
+  
+  // Listen on window for broader mouse movement coverage
+  window.addEventListener("mousemove", (event) => {
+    if (isFixed) {
+      mouseX = (event.clientX - window.innerWidth / 2) * 0.5;
+      mouseY = (event.clientY - window.innerHeight / 2) * 0.5;
+    } else {
+      const rect = container.getBoundingClientRect();
+      mouseX = (event.clientX - rect.left - rect.width / 2) * 0.5;
+      mouseY = (event.clientY - rect.top - rect.height / 2) * 0.5;
+    }
+  });
+
+  function animate() {
+    requestAnimationFrame(animate);
+
+    const positions = particleSystem.geometry.attributes.position.array;
+    const linePositions = [];
+
+    for (let i = 0; i < particleCount; i++) {
+      positions[i * 3] += velocities[i].x;
+      positions[i * 3 + 1] += velocities[i].y;
+      positions[i * 3 + 2] += velocities[i].z;
+
+      if (Math.abs(positions[i * 3]) > 400) velocities[i].x *= -1;
+      if (Math.abs(positions[i * 3 + 1]) > 200) velocities[i].y *= -1;
+      if (Math.abs(positions[i * 3 + 2]) > 200) velocities[i].z *= -1;
+    }
+
+    for (let i = 0; i < particleCount; i++) {
+      for (let j = i + 1; j < particleCount; j++) {
+        const dx = positions[i * 3] - positions[j * 3];
+        const dy = positions[i * 3 + 1] - positions[j * 3 + 1];
+        const dz = positions[i * 3 + 2] - positions[j * 3 + 2];
+        const distSq = dx*dx + dy*dy + dz*dz;
+
+        if (distSq < 13000) { // Adjusted to 13,000 for both themes
+          linePositions.push(
+            positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2],
+            positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2]
+          );
+        }
+      }
+    }
+
+    lineMesh.geometry.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+    particleSystem.geometry.attributes.position.needsUpdate = true;
+
+    camera.position.x += (mouseX - camera.position.x) * 0.02; 
+    camera.position.y += (-mouseY - camera.position.y) * 0.02; 
+
+    // FORCE Z-DISTANCE: Restricted camera Z position to a very tight, close range (Base 100)
+    const targetZ = Math.max(95, Math.min(105, 100 + (mouseY * 0.002))); 
+    camera.position.z += (targetZ - camera.position.z) * 0.02;
+
+    camera.lookAt(scene.position);
+    renderer.render(scene, camera);
+  }
+  animate();
+}
 (function() {
   const theme = localStorage.getItem("theme") || "dark";
   document.documentElement.setAttribute("data-theme", theme);
@@ -2966,9 +3108,11 @@ window.addEventListener("load", hideLoader);
 
 if (page === "landing") {
   initLanding();
+  initNeuralLink();
 }
 if (page === "login" || page === "signup") {
   initAuth();
+  initNeuralLink();
 }
 initTheme();
 checkAuth();
@@ -2977,6 +3121,7 @@ initLinkInterceptors();
 initThree();
 if (page === "dashboard") {
   initDashboard();
+  initNeuralLink();
   // Warm the inference backend as soon as the workspace opens, so that a sleeping
   // Space is woken (and the user is told about it) before they pick a file.
   ensureBackendAwake();
