@@ -5,3 +5,17 @@ dist
 .trae
 .log
 .figma
+
+# Ignore Python backend to prevent Vercel from trying to build it
+app.py
+app_server.py
+requirements.txt
+backend/
+convex/
+Dockerfile
+docker-compose.yml
+*.py
+*.sh
+*.bat
+venv/
+.env*

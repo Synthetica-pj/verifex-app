@@ -3,8 +3,9 @@ title: Verifex
 emoji: ⚖️
 colorFrom: indigo
 colorTo: purple
-sdk: docker
-app_port: 7860
+sdk: gradio
+sdk_version: 6.9.0
+app_file: app.py
 pinned: false
 ---
 
@@ -29,7 +30,8 @@ highest-variance feature channels.
 
 ```
 .
-├── app_server.py            Entry point: serves the API and the static UI
+├── app.py                   Hugging Face Space entry point (boots app_server on 7860)
+├── app_server.py            Serves the API and the static UI
 ├── backend/
 │   └── xception_deepfake_detector.h5   Trained model (299x299x3, frozen base)
 ├── web/                     Static frontend (also deployed to Vercel)
@@ -39,7 +41,7 @@ highest-variance feature channels.
 │   ├── app.js               Frontend logic, API routing, sleep/wake handling
 │   └── config.js            Sets window.__VERIFEX_API_BASE__ for production
 ├── convex/                  Convex schema + functions (scan history, users)
-├── Dockerfile               Hugging Face Space image (port 7860)
+├── Dockerfile               Optional container image (port 7860)
 ├── docker-compose.yml       Optional local container run
 └── requirements.txt         Pinned Python dependencies
 ```
@@ -80,7 +82,12 @@ so the port is reachable immediately while the model warms up.
 ## Deployment
 
 - **Frontend:** Vercel, with the project root set to `web/`.
-- **Backend:** Hugging Face Space (Docker SDK), listening on `app_port` 7860.
+- **Backend:** Hugging Face Space, listening on port 7860.
+
+The Space's `README.md` frontmatter deliberately keeps `sdk: gradio` (rather than
+`sdk: docker`) because that Space's free `cpu-basic` allocation is tied to the
+Gradio SDK. `app.py` therefore does not start a Gradio UI — it simply boots the
+Verifex HTTP backend on port 7860.
 
 Because free Spaces sleep when idle, the frontend pings `/health` before every
 scan. If the backend is asleep it shows a notice and polls until the Space

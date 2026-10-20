@@ -5,9 +5,8 @@
 // where to send its requests. This value is not a secret: the Space is public and
 // the API requires no credentials.
 (function () {
-  // Set to the deployed backend once the Hugging Face Space exists, e.g.
-  // "https://synthetica-pj-verifex.hf.space"
-  var PRODUCTION_API_BASE = "";
+  // Deployed Verifex inference backend (Hugging Face Space).
+  var PRODUCTION_API_BASE = "https://verifexorg1-verifex.hf.space";
 
   // "" means same origin, which is what local development and the bundled
   // fallback UI (the Python server serving this same folder) rely on.
