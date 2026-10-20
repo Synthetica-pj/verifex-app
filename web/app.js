@@ -2793,7 +2793,6 @@ async function logout() {
 }
 
 function initThree() {
-  // Unifying background animation across all pages
   const canvas = $("canvas-bg");
   if (!canvas) return;
 
@@ -2803,62 +2802,97 @@ function initThree() {
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-  camera.position.z = 100;
+  camera.position.z = 400;
 
-  const geometry = new THREE.BufferGeometry();
-  const vertices = [];
-  const size = 2000;
+  const particleCount = 120;
+  const particles = new THREE.BufferGeometry();
+  const posArray = new Float32Array(particleCount * 3);
+  const velocity = [];
 
-  for (let i = 0; i < 5000; i++) {
-    const x = (Math.random() - 0.5) * size;
-    const y = (Math.random() - 0.5) * size;
-    const z = (Math.random() - 0.5) * size;
-    vertices.push(x, y, z);
+  for (let i = 0; i < particleCount * 3; i += 3) {
+    posArray[i] = (Math.random() - 0.5) * 1000;
+    posArray[i + 1] = (Math.random() - 0.5) * 1000;
+    posArray[i + 2] = (Math.random() - 0.5) * 1000;
+    velocity.push((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5);
   }
 
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  particles.setAttribute("position", new THREE.BufferAttribute(posArray, 3));
 
   const getThemeColor = () => {
     const theme = document.documentElement.getAttribute("data-theme");
-    return theme === "light" ? 0x000000 : 0xffffff;
+    return theme === "light" ? 0x14b8a6 : 0x14b8a6; // Use brand teal for both
   };
 
   const material = new THREE.PointsMaterial({
     color: getThemeColor(),
-    size: 1.5,
+    size: 3,
     transparent: true,
-    opacity: 0.2,
-    sizeAttenuation: true,
+    opacity: 0.8,
   });
 
-  const points = new THREE.Points(geometry, material);
+  const points = new THREE.Points(particles, material);
   scene.add(points);
 
-  window.bgPoints = points;
+  // Line Segments for Constellation
+  const lineGeometry = new THREE.BufferGeometry();
+  const lineMaterial = new THREE.LineBasicMaterial({
+    color: getThemeColor(),
+    transparent: true,
+    opacity: 0.2,
+  });
+  const lineMesh = new THREE.LineSegments(lineGeometry, lineMaterial);
+  scene.add(lineMesh);
+
   window.bgMaterial = material;
+  window.bgLineMaterial = lineMaterial;
 
   let mouseX = 0;
   let mouseY = 0;
 
   document.addEventListener("mousemove", (event) => {
-    mouseX = (event.clientX - window.innerWidth / 2) / 100;
-    mouseY = (event.clientY - window.innerHeight / 2) / 100;
+    mouseX = (event.clientX - window.innerWidth / 2) / 20;
+    mouseY = (event.clientY - window.innerHeight / 2) / 20;
   });
 
   function animate() {
     requestAnimationFrame(animate);
 
-    points.rotation.x += 0.0005;
-    points.rotation.y += 0.0005;
+    const positions = particles.attributes.position.array;
+    const linePositions = [];
+
+    for (let i = 0; i < particleCount; i++) {
+      const i3 = i * 3;
+      positions[i3] += velocity[i3];
+      positions[i3 + 1] += velocity[i3 + 1];
+      positions[i3 + 2] += velocity[i3 + 2];
+
+      // Boundary check
+      if (Math.abs(positions[i3]) > 500) velocity[i3] *= -1;
+      if (Math.abs(positions[i3 + 1]) > 500) velocity[i3 + 1] *= -1;
+      if (Math.abs(positions[i3 + 2]) > 500) velocity[i3 + 2] *= -1;
+
+      // Check distance to other particles for lines
+      for (let j = i + 1; j < particleCount; j++) {
+        const j3 = j * 3;
+        const dx = positions[i3] - positions[j3];
+        const dy = positions[i3 + 1] - positions[j3 + 1];
+        const dz = positions[i3 + 2] - positions[j3 + 2];
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        if (dist < 150) {
+          linePositions.push(positions[i3], positions[i3 + 1], positions[i3 + 2]);
+          linePositions.push(positions[j3], positions[j3 + 1], positions[j3 + 2]);
+        }
+      }
+    }
+
+    particles.attributes.position.needsUpdate = true;
+    lineGeometry.setAttribute("position", new THREE.Float32BufferAttribute(linePositions, 3));
 
     camera.position.x += (mouseX - camera.position.x) * 0.05;
     camera.position.y += (-mouseY - camera.position.y) * 0.05;
-    
-    // FORCE Z-DISTANCE: Restrict camera Z position to a tight, close range (Base 100)
-    const targetZ = Math.max(95, Math.min(105, 100 + (mouseY * 0.002))); 
-    camera.position.z += (targetZ - camera.position.z) * 0.02;
-
     camera.lookAt(scene.position);
+
     renderer.render(scene, camera);
   }
 
@@ -2878,9 +2912,11 @@ function initTheme() {
     localStorage.setItem("theme", theme);
     
     if (window.bgMaterial) {
-      const color = theme === "light" ? 0x000000 : 0xffffff;
+      const color = 0x14b8a6; // Keep brand teal
       window.bgMaterial.color.setHex(color);
-      window.bgMaterial.opacity = theme === "light" ? 0.05 : 0.2;
+      window.bgLineMaterial.color.setHex(color);
+      window.bgMaterial.opacity = theme === "light" ? 0.4 : 0.8;
+      window.bgLineMaterial.opacity = theme === "light" ? 0.1 : 0.2;
     }
     
     const nav = document.querySelector('.nav');
